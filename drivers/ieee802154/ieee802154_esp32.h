@@ -29,6 +29,13 @@ struct ieee802154_esp32_data {
 	 */
 	struct k_sem tx_wait;
 
+	/* Last TX outcome, recorded by the transmit_done/transmit_failed
+	 * callbacks. 0 == ESP_IEEE802154_TX_ERR_NONE. Without this the failed
+	 * callback's error argument is discarded and a CCA_BUSY/NO_ACK frame is
+	 * indistinguishable from a delivered one (tuvm #59 diagnostic).
+	 */
+	volatile int tx_error;
+
 	/* TX buffer. First byte is PHR (length), remaining bytes are
 	 * MPDU data.
 	 */

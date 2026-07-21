@@ -277,6 +277,7 @@ void IRAM_ATTR esp_ieee802154_transmit_done(const uint8_t *tx_frame, const uint8
 {
 	esp32_data.ack_frame = ack_frame;
 	esp32_data.ack_frame_info = ack_frame_info;
+	esp32_data.tx_error = ESP_IEEE802154_TX_ERR_NONE;
 
 	k_sem_give(&esp32_data.tx_wait);
 }
@@ -284,6 +285,19 @@ void IRAM_ATTR esp_ieee802154_transmit_done(const uint8_t *tx_frame, const uint8
 /* override weak function in components/ieee802154/esp_ieee802154.c of ESP-IDF */
 void IRAM_ATTR esp_ieee802154_transmit_failed(const uint8_t *frame, esp_ieee802154_tx_error_t error)
 {
+	/* tuvm #59: upstream DISCARDS `error` here, so esp32_tx()'s k_sem_take()
+	 * returns 0 for a frame that was never delivered and the driver reports
+	 * success — OpenThread is told the frame went out and never retransmits.
+	 * Record it so esp32_tx() can report the real outcome.
+	 *
+	 * ack_frame must also be cleared: a failed TX produces no ACK, and leaving
+	 * the previous TX's pointer would have handle_ack() release an already
+	 * released frame.
+	 */
+	esp32_data.tx_error = error;
+	esp32_data.ack_frame = NULL;
+	esp32_data.ack_frame_info = NULL;
+
 	k_sem_give(&esp32_data.tx_wait);
 }
 
@@ -307,6 +321,7 @@ static int esp32_tx(const struct device *dev, enum ieee802154_tx_mode tx_mode, s
 	memcpy(data->tx_psdu + 1, payload, payload_len);
 
 	k_sem_reset(&data->tx_wait);
+	data->tx_error = ESP_IEEE802154_TX_ERR_NONE;
 
 	switch (tx_mode) {
 	case IEEE802154_TX_MODE_DIRECT:
@@ -346,11 +361,30 @@ static int esp32_tx(const struct device *dev, enum ieee802154_tx_mode tx_mode, s
 
 	if (err != 0) {
 		LOG_ERR("TX timeout");
-	} else {
-		handle_ack(data);
+		return -EIO;
 	}
 
-	return err == 0 ? 0 : -EIO;
+	/* tuvm #59: report the ACTUAL outcome. The upper layer maps -EBUSY to
+	 * OT_ERROR_CHANNEL_ACCESS_FAILURE and -ENOMSG to OT_ERROR_NO_ACK, both of
+	 * which drive OpenThread's MAC retransmit; returning 0 for a frame that
+	 * lost the channel or went unacknowledged silently drops it instead.
+	 */
+	switch (data->tx_error) {
+	case ESP_IEEE802154_TX_ERR_NONE:
+		break;
+	case ESP_IEEE802154_TX_ERR_CCA_BUSY:
+	case ESP_IEEE802154_TX_ERR_COEXIST:
+		return -EBUSY;
+	case ESP_IEEE802154_TX_ERR_NO_ACK:
+	case ESP_IEEE802154_TX_ERR_INVALID_ACK:
+		return -ENOMSG;
+	default:
+		return -EIO;
+	}
+
+	handle_ack(data);
+
+	return 0;
 }
 
 static int esp32_start(const struct device *dev)
