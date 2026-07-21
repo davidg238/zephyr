@@ -267,6 +267,7 @@ free_net_ack:
 free_esp_ack:
 	esp_ieee802154_receive_handle_done(data->ack_frame);
 	data->ack_frame = NULL;
+	data->ack_frame_info = NULL;
 
 	return err;
 }
@@ -290,13 +291,11 @@ void IRAM_ATTR esp_ieee802154_transmit_failed(const uint8_t *frame, esp_ieee8021
 	 * success — OpenThread is told the frame went out and never retransmits.
 	 * Record it so esp32_tx() can report the real outcome.
 	 *
-	 * ack_frame must also be cleared: a failed TX produces no ACK, and leaving
-	 * the previous TX's pointer would have handle_ack() release an already
-	 * released frame.
+	 * The stale-ack_frame clearing that used to live here moved to esp32_tx()
+	 * (zephyr#114163 review): clearing at the START of every transmission also
+	 * covers the TX-timeout path, which never reaches handle_ack().
 	 */
 	esp32_data.tx_error = error;
-	esp32_data.ack_frame = NULL;
-	esp32_data.ack_frame_info = NULL;
 
 	k_sem_give(&esp32_data.tx_wait);
 }
@@ -322,6 +321,13 @@ static int esp32_tx(const struct device *dev, enum ieee802154_tx_mode tx_mode, s
 
 	k_sem_reset(&data->tx_wait);
 	data->tx_error = ESP_IEEE802154_TX_ERR_NONE;
+
+	/* Start from a clean state: a transmission that times out never reaches
+	 * handle_ack(), so pointers from the previous transmission would
+	 * otherwise stay live and be released a second time.
+	 */
+	data->ack_frame = NULL;
+	data->ack_frame_info = NULL;
 
 	switch (tx_mode) {
 	case IEEE802154_TX_MODE_DIRECT:
