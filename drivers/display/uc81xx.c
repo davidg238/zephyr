@@ -82,6 +82,7 @@ struct uc81xx_config {
 
 	uint16_t height;
 	uint16_t width;
+	bool rotate_180;
 
 	struct uc81xx_dt_array softstart;
 
@@ -197,10 +198,12 @@ static int uc81xx_set_profile(const struct device *dev,
 	struct uc81xx_data *data = dev->data;
 	uint8_t psr =
 		UC81XX_PSR_KW_R |
-		UC81XX_PSR_UD |
-		UC81XX_PSR_SHL |
 		UC81XX_PSR_SHD |
 		UC81XX_PSR_RST;
+
+	if (!config->rotate_180) {
+		psr |= UC81XX_PSR_UD | UC81XX_PSR_SHL;
+	}
 
 	if (type >= UC81XX_NUM_PROFILES) {
 		return -EINVAL;
@@ -832,6 +835,7 @@ static DEVICE_API(display, uc81xx_driver_api) = {
 									\
 		.height = DT_PROP(n, height),				\
 		.width = DT_PROP(n, width),				\
+		.rotate_180 = DT_PROP(n, rotate_180),			\
 									\
 		.softstart = UC81XX_ASSIGN_ARRAY(n, softstart),		\
 									\

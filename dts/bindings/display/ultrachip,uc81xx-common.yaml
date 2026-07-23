@@ -25,6 +25,16 @@ properties:
     type: uint8-array
     description: Booster Soft Start (BTST) values
 
+  rotate-180:
+    type: boolean
+    description: |
+      Rotate the panel by 180 degrees. This clears the UD (gate scan
+      direction) and SHL (source shift direction) bits of the panel
+      setting register, so the flip is performed by the controller and
+      costs no memory or computation. Unlike a 90 or 270 degree
+      rotation, which would require transposing the frame buffer, this
+      family supports 180 degrees natively.
+
 child-binding:
   description: |
     Child nodes describe refresh profiles. Each refresh profile
