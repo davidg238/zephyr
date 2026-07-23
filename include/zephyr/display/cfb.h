@@ -191,6 +191,28 @@ int cfb_invert_area(const struct device *dev, uint16_t x, uint16_t y,
 int cfb_framebuffer_finalize(const struct device *dev);
 
 /**
+ * @brief Finalize a rectangular region of the framebuffer to the display.
+ *
+ * Identical to @ref cfb_framebuffer_finalize but writes only the given
+ * rectangle. On displays whose driver treats a bounded write as a partial
+ * update (e-paper), this is what makes a partial refresh possible: the full
+ * finalize always writes the whole panel.
+ *
+ * @param dev Pointer to device structure
+ * @param x Column of the top-left corner, in pixels
+ * @param y Row of the top-left corner, in pixels
+ * @param width Width of the region, in pixels
+ * @param height Height of the region, in pixels
+ *
+ * @retval 0 on success
+ * @retval -ENODEV if the framebuffer has not been initialized
+ * @retval -EINVAL if the rectangle is not contained by the framebuffer
+ * @retval negative errno propagated from the display driver
+ */
+int cfb_framebuffer_finalize_area(const struct device *dev, uint16_t x, uint16_t y,
+				  uint16_t width, uint16_t height);
+
+/**
  * @brief Get display parameter.
  *
  * @param dev Pointer to device structure for driver instance

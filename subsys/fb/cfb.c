@@ -585,6 +585,50 @@ int cfb_framebuffer_finalize(const struct device *dev)
 	return api->write(dev, 0, 0, &desc, fb->buf);
 }
 
+int cfb_framebuffer_finalize_area(const struct device *dev, uint16_t x, uint16_t y,
+				  uint16_t width, uint16_t height)
+{
+	const struct display_driver_api *api = dev->api;
+	const struct char_framebuffer *fb = &char_fb;
+	int err;
+
+	__ASSERT_NO_MSG(DEVICE_API_IS(display, dev));
+
+	if (!fb->buf) {
+		return -ENODEV;
+	}
+
+	if ((uint32_t)x + width > fb->x_res || (uint32_t)y + height > fb->y_res) {
+		return -EINVAL;
+	}
+
+	struct display_buffer_descriptor desc = {
+		.buf_size = (size_t)width * height / 8U,
+		.width = width,
+		.height = height,
+		.pitch = width,
+	};
+
+	/* The framebuffer is contiguous row-major with a pitch of x_res, so a
+	 * full-width band starting on a byte boundary is contiguous. Anything
+	 * narrower would need a strided copy, which no caller needs yet.
+	 */
+	if (width != fb->x_res) {
+		return -ENOTSUP;
+	}
+
+	uint8_t *start = fb->buf + ((size_t)y * fb->x_res / 8U);
+
+	if ((fb->pixel_format == PIXEL_FORMAT_MONO10) == fb->inverted) {
+		cfb_invert(fb);
+		err = api->write(dev, x, y, &desc, start);
+		cfb_invert(fb);
+		return err;
+	}
+
+	return api->write(dev, x, y, &desc, start);
+}
+
 int cfb_get_display_parameter(const struct device *dev,
 			       enum cfb_display_param param)
 {
