@@ -631,7 +631,8 @@ static inline int uc81xx_set_ptl_16(const struct device *dev, uint16_t x, uint16
 }
 #endif
 
-#if DT_HAS_COMPAT_STATUS_OKAY(ultrachip_uc8175) || DT_HAS_COMPAT_STATUS_OKAY(ultrachip_uc8176)
+#if DT_HAS_COMPAT_STATUS_OKAY(ultrachip_uc8175) || DT_HAS_COMPAT_STATUS_OKAY(ultrachip_uc8176) || \
+	DT_HAS_COMPAT_STATUS_OKAY(ultrachip_il0373)
 static int uc8176_set_cdi(const struct device *dev, bool border)
 {
 	const struct uc81xx_config *config = dev->config;
@@ -652,6 +653,50 @@ static int uc8176_set_cdi(const struct device *dev, bool border)
 	LOG_DBG("CDI: %#hhx", cdi);
 	return uc81xx_write_cmd_uint8(dev, UC81XX_CMD_CDI, cdi);
 }
+#endif
+
+#if DT_HAS_COMPAT_STATUS_OKAY(ultrachip_il0373)
+static int uc81xx_set_tres_il0373(const struct device *dev)
+{
+	const struct uc81xx_config *config = dev->config;
+	const struct uc81xx_tres_il0373 tres = {
+		.hres = config->width,
+		.vres = sys_cpu_to_be16(config->height),
+	};
+
+	LOG_HEXDUMP_DBG(&tres, sizeof(tres), "TRES");
+
+	return uc81xx_write_cmd(dev, UC81XX_CMD_TRES, (const void *)&tres, sizeof(tres));
+}
+
+static inline int uc81xx_set_ptl_il0373(const struct device *dev, uint16_t x, uint16_t y,
+					uint16_t x_end_idx, uint16_t y_end_idx,
+					const struct display_buffer_descriptor *desc)
+{
+	const struct uc81xx_ptl_il0373 ptl = {
+		.hrst  = x,
+		.hred  = x_end_idx,
+		.vrst  = sys_cpu_to_be16(y),
+		.vred  = sys_cpu_to_be16(y_end_idx),
+		.flags = UC81XX_PTL_FLAG_PT_SCAN,
+	};
+
+	/* Setup Partial Window and enable Partial Mode */
+	LOG_HEXDUMP_DBG(&ptl, sizeof(ptl), "ptl");
+
+	return uc81xx_write_cmd(dev, UC81XX_CMD_PTL, (const void *)&ptl, sizeof(ptl));
+}
+
+static const struct uc81xx_quirks il0373_quirks = {
+	.max_width  = 160,
+	.max_height = 296,
+
+	.auto_copy = false,
+
+	.set_cdi  = uc8176_set_cdi,
+	.set_tres = uc81xx_set_tres_il0373,
+	.set_ptl  = uc81xx_set_ptl_il0373,
+};
 #endif
 
 #if DT_HAS_COMPAT_STATUS_OKAY(ultrachip_uc8175)
@@ -815,3 +860,6 @@ DT_FOREACH_STATUS_OKAY_VARGS(ultrachip_uc8176, UC81XX_DEFINE,
 
 DT_FOREACH_STATUS_OKAY_VARGS(ultrachip_uc8179, UC81XX_DEFINE,
 			     &uc8179_quirks);
+
+DT_FOREACH_STATUS_OKAY_VARGS(ultrachip_il0373, UC81XX_DEFINE,
+			     &il0373_quirks);

@@ -140,6 +140,30 @@ struct uc81xx_ptl16 {
 
 BUILD_ASSERT(sizeof(struct uc81xx_ptl16) == 9);
 
+/* IL0373 (tuvm#88). A third TRES/PTL width: the horizontal fields are one byte
+ * (the panel is at most 160 px wide, addressed in units of 8) while the vertical
+ * ones are two (up to 296 rows). Neither the uc8175 8-bit pair nor the uc8176/79
+ * 16-bit pair can express that, which is the only reason this controller needs
+ * quirks of its own. Byte order is big-endian on the wire, applied by the
+ * accessors in uc81xx.c via sys_cpu_to_be16 — NOT here.
+ */
+struct uc81xx_tres_il0373 {
+	uint8_t  hres;
+	uint16_t vres;
+} __packed;
+
+BUILD_ASSERT(sizeof(struct uc81xx_tres_il0373) == 3);
+
+struct uc81xx_ptl_il0373 {
+	uint8_t  hrst;
+	uint8_t  hred;
+	uint16_t vrst;
+	uint16_t vred;
+	uint8_t  flags;
+} __packed;
+
+BUILD_ASSERT(sizeof(struct uc81xx_ptl_il0373) == 7);
+
 #define UC81XX_PTL_FLAG_PT_SCAN			BIT(0)
 
 /* Time constants in ms */
