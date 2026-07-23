@@ -198,6 +198,12 @@ int cfb_framebuffer_finalize(const struct device *dev);
  * update (e-paper), this is what makes a partial refresh possible: the full
  * finalize always writes the whole panel.
  *
+ * The framebuffer is row-major, so only a full-width band (@p width equal
+ * to the display's horizontal resolution) can be extracted as a contiguous
+ * run of bytes; a narrower rectangle is rejected. Vertically-tiled
+ * framebuffers (@ref SCREEN_INFO_MONO_VTILED) use a different byte layout
+ * that this function does not support.
+ *
  * @param dev Pointer to device structure
  * @param x Column of the top-left corner, in pixels
  * @param y Row of the top-left corner, in pixels
@@ -207,6 +213,8 @@ int cfb_framebuffer_finalize(const struct device *dev);
  * @retval 0 on success
  * @retval -ENODEV if the framebuffer has not been initialized
  * @retval -EINVAL if the rectangle is not contained by the framebuffer
+ * @retval -ENOTSUP if @p width is not the full display width, or the
+ *         framebuffer is vertically tiled (@ref SCREEN_INFO_MONO_VTILED)
  * @retval negative errno propagated from the display driver
  */
 int cfb_framebuffer_finalize_area(const struct device *dev, uint16_t x, uint16_t y,

@@ -602,13 +602,6 @@ int cfb_framebuffer_finalize_area(const struct device *dev, uint16_t x, uint16_t
 		return -EINVAL;
 	}
 
-	struct display_buffer_descriptor desc = {
-		.buf_size = (size_t)width * height / 8U,
-		.width = width,
-		.height = height,
-		.pitch = width,
-	};
-
 	/* The framebuffer is contiguous row-major with a pitch of x_res, so a
 	 * full-width band starting on a byte boundary is contiguous. Anything
 	 * narrower would need a strided copy, which no caller needs yet.
@@ -616,6 +609,17 @@ int cfb_framebuffer_finalize_area(const struct device *dev, uint16_t x, uint16_t
 	if (width != fb->x_res) {
 		return -ENOTSUP;
 	}
+
+	if (fb->screen_info & SCREEN_INFO_MONO_VTILED) {
+		return -ENOTSUP;
+	}
+
+	struct display_buffer_descriptor desc = {
+		.buf_size = (size_t)width * height / 8U,
+		.width = width,
+		.height = height,
+		.pitch = width,
+	};
 
 	uint8_t *start = fb->buf + ((size_t)y * fb->x_res / 8U);
 
