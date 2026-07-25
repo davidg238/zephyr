@@ -63,7 +63,16 @@
 #define IS_IROM(o) (o.load_addr >= SOC_IROM_LOW && o.load_addr < SOC_IROM_HIGH)
 #define IS_DROM(o) (o.load_addr >= SOC_DROM_LOW && o.load_addr < SOC_DROM_HIGH)
 #ifdef SOC_RTC_MEM_SUPPORTED
-#define IS_RTC(o) (o.load_addr >= SOC_RTC_DRAM_LOW && o.load_addr < SOC_RTC_DRAM_HIGH)
+/* All three RTC windows: data bus (RTC_DRAM), instruction bus (RTC_IRAM, where the
+ * deep-sleep wake stub loads), and RTC slow memory (RTC_DATA). Covering only RTC_DRAM
+ * made any image containing a wake stub or RTC_DATA_ATTR data hit IS_LAST early, so
+ * the IROM/DROM flash-offset fix-up below never ran and the app booted from stale
+ * linker-derived offsets (silent crash at the bootloader handoff).
+ */
+#define IS_RTC(o)                                                                          \
+	((o.load_addr >= SOC_RTC_DRAM_LOW && o.load_addr < SOC_RTC_DRAM_HIGH) ||           \
+	 (o.load_addr >= SOC_RTC_IRAM_LOW && o.load_addr < SOC_RTC_IRAM_HIGH) ||           \
+	 (o.load_addr >= SOC_RTC_DATA_LOW && o.load_addr < SOC_RTC_DATA_HIGH))
 #else
 #define IS_RTC(o) 0
 #endif
